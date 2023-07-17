@@ -25,6 +25,9 @@ def save_to_csv(emails):
     csv_data = "Email\n" + "\n".join(emails)
     csv_bytes = csv_data.encode()
 
+    # Set the option to automatically download the CSV file
+    st.set_option('deprecation.showfileUploaderEncoding', False)
+
     st.download_button(
         label="Download CSV",
         data=csv_bytes,
@@ -36,7 +39,7 @@ def main():
     st.title("Email Extractor App")
 
     # Choose the social media platform
-    social_media = st.selectbox("Choose the social media platform:", ["facebook", "instagram", "telegram", "twitter", "linkedin"])
+    social_media = st.selectbox("Choose the social media platform:", ["instagram", "facebook", "twitter", "linkedin"])
 
     # Input keyword after "CODIGO:"
     keyword = st.text_input("Enter the keyword after CODIGO:", "Academia")
@@ -64,9 +67,8 @@ def main():
     # Print the total number of results found
     st.write(f"Total number of email addresses found: {len(unique_emails)}")
 
-    # Save unique emails to CSV file when the button is clicked
-    if st.button("Download CSV"):
-        save_to_csv(unique_emails)
+    # Save unique emails to CSV file
+    save_to_csv(unique_emails)
 
 if __name__ == "__main__":
     main()
