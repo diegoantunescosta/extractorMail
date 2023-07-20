@@ -1,10 +1,9 @@
 import re
-import time
-import pandas as pd
+import requests
 import streamlit as st
+import pandas as pd
 from io import BytesIO
 from bs4 import BeautifulSoup
-from selenium import webdriver
 
 def validate_email(email):
     # Simple email validation regex
@@ -44,6 +43,14 @@ def save_to_csv(emails):
         mime="text/csv",
     )
 
+def fetch_google_search_results(search_query):
+    # Fetch the search results HTML content from Google
+    url = f"https://www.google.com/search?q={search_query}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"}
+    response = requests.get(url, headers=headers)
+    return response.text
+
 def main():
     st.title("Email Extractor App")
 
@@ -60,27 +67,16 @@ def main():
     search_query = f"CODIGO: {keyword} (@gmail.com OR @hotmail.com OR @yahoo.com) AND Brazil site:{social_media}.com/"
     unique_emails = set()
 
-    # Set up the Selenium web driver (you need to download the appropriate driver for your browser)
-    driver = webdriver.Chrome()
-
     # Extract emails and filter
     for page_idx in range(1, num_pages + 1):
-        url = f"https://www.google.com/search?q={search_query}&start={(page_idx - 1) * 10}"
-        driver.get(url)
-
-        # Wait for the page to load (adjust the sleep time as needed)
-        time.sleep(5)
-
-        # Get the page source after scrolling to the bottom to load all content
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(2)
-        page_source = driver.page_source
+        # Fetch the search results page HTML content
+        response_text = fetch_google_search_results(search_query + f"&start={(page_idx - 1) * 10}")
 
         # Extract emails using regex from the search result HTML content
-        emails_from_html = extract_emails_from_html(page_source)
+        emails_from_html = extract_emails_from_html(response_text)
 
         # Parse the HTML content using BeautifulSoup
-        soup = BeautifulSoup(page_source, "html.parser")
+        soup = BeautifulSoup(response_text, "html.parser")
 
         # Extract emails from the title, description, and meta tags
         title_emails = extract_emails_from_html(soup.title.text)
@@ -99,9 +95,6 @@ def main():
         valid_emails = {email.lower() for email in all_emails if validate_email(email) and not has_variables(email) and has_two_characters_before_at(email) and not contains_keyword(email, keyword)}
 
         unique_emails.update(valid_emails)
-
-    # Close the web driver
-    driver.quit()
 
     # Print the total number of results found
     st.write(f"Total number of email addresses found: {len(unique_emails)}")
