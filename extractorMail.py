@@ -3,6 +3,7 @@ import requests
 import streamlit as st
 import pandas as pd
 from io import BytesIO
+from bs4 import BeautifulSoup
 
 def validate_email(email):
     # Simple email validation regex
@@ -20,6 +21,13 @@ def has_two_characters_before_at(email):
 def contains_keyword(email, keyword):
     # Check if the email contains the given keyword
     return keyword.lower() in email.lower()
+
+def extract_emails_from_html(html_content):
+    # Extract emails from the HTML content using regex
+    email_regex = r"[a-zA-Z0-9._%+-]{2,}@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+    emails = re.findall(email_regex, html_content)
+
+    return emails
 
 def save_to_csv(emails):
     csv_data = "Email\n" + "\n".join(emails)
@@ -56,13 +64,29 @@ def main():
         url = f"https://www.google.com/search?q={search_query}&start={(page_idx - 1) * 10}"
         response = requests.get(url)
 
-        # Extract emails using regex
-        email_regex = r"[a-zA-Z0-9._%+-]{2,}@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-        emails = re.findall(email_regex, response.text)
+        # Extract emails using regex from the search result HTML content
+        emails_from_html = extract_emails_from_html(response.text)
 
-        if emails:
-            valid_emails = {email.lower() for email in emails if validate_email(email) and not has_variables(email) and has_two_characters_before_at(email) and not contains_keyword(email, keyword)}
-            unique_emails.update(valid_emails)
+        # Parse the HTML content using BeautifulSoup
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Extract emails from the title, description, and meta tags
+        title_emails = extract_emails_from_html(soup.title.text)
+
+        # Check if the meta tags exist before accessing their attributes
+        meta_tag_description = soup.find("meta", {"name": "description"})
+        description_emails = extract_emails_from_html(meta_tag_description.get("content", "")) if meta_tag_description else []
+
+        meta_tag_keywords = soup.find("meta", {"name": "keywords"})
+        meta_emails = extract_emails_from_html(meta_tag_keywords.get("content", "")) if meta_tag_keywords else []
+
+        # Combine all extracted emails and remove duplicates
+        all_emails = set(emails_from_html + title_emails + description_emails + meta_emails)
+
+        # Filter valid emails as before
+        valid_emails = {email.lower() for email in all_emails if validate_email(email) and not has_variables(email) and has_two_characters_before_at(email) and not contains_keyword(email, keyword)}
+
+        unique_emails.update(valid_emails)
 
     # Print the total number of results found
     st.write(f"Total number of email addresses found: {len(unique_emails)}")
