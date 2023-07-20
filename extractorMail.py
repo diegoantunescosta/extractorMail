@@ -5,7 +5,6 @@ import pandas as pd
 from io import BytesIO
 from bs4 import BeautifulSoup
 
-
 def validate_email(email):
     # Simple email validation regex
     email_regex = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
@@ -44,6 +43,14 @@ def save_to_csv(emails):
         mime="text/csv",
     )
 
+def fetch_google_search_results(search_query):
+    # Fetch the search results HTML content from Google
+    url = f"https://www.google.com/search?q={search_query}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"}
+    response = requests.get(url, headers=headers)
+    return response.text
+
 def main():
     st.title("Email Extractor App")
 
@@ -62,27 +69,24 @@ def main():
 
     # Extract emails and filter
     for page_idx in range(1, num_pages + 1):
-        url = f"https://www.google.com/search?q={search_query}&start={(page_idx - 1) * 10}"
-        response = requests.get(url)
-
-        # Extract emails using regex from the search result HTML content
-        emails_from_html = extract_emails_from_html(response.text)
+        # Fetch the search results page HTML content
+        response_text = fetch_google_search_results(search_query + f"&start={(page_idx - 1) * 10}")
 
         # Parse the HTML content using BeautifulSoup
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = BeautifulSoup(response_text, "html.parser")
 
-        # Extract emails from the title, description, and meta tags
-        title_emails = extract_emails_from_html(soup.title.text)
+        # Find the <div> elements with the specified class
+        div_elements = soup.find_all("div", class_="VwiC3b yXK7lf MUxGbd yDYNvb lyLwlc lEBKkf")
 
-        # Check if the meta tags exist before accessing their attributes
-        meta_tag_description = soup.find("meta", {"name": "description"})
-        description_emails = extract_emails_from_html(meta_tag_description.get("content", "")) if meta_tag_description else []
-
-        meta_tag_keywords = soup.find("meta", {"name": "keywords"})
-        meta_emails = extract_emails_from_html(meta_tag_keywords.get("content", "")) if meta_tag_keywords else []
+        # Extract emails from <span> tags within the specified <div> elements
+        emails_from_div = []
+        for div_element in div_elements:
+            span_tags = div_element.find_all("span")
+            emails_from_span = [tag.get_text() for tag in span_tags if re.match(r"[a-zA-Z0-9._%+-]{2,}@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", tag.get_text())]
+            emails_from_div.extend(emails_from_span)
 
         # Combine all extracted emails and remove duplicates
-        all_emails = set(emails_from_html + title_emails + description_emails + meta_emails)
+        all_emails = set(emails_from_div)
 
         # Filter valid emails as before
         valid_emails = {email.lower() for email in all_emails if validate_email(email) and not has_variables(email) and has_two_characters_before_at(email) and not contains_keyword(email, keyword)}
