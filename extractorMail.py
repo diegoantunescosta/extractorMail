@@ -3,7 +3,9 @@ import requests
 import streamlit as st
 import pandas as pd
 from io import BytesIO
+!pip install BeautifulSoup
 from bs4 import BeautifulSoup
+
 
 def validate_email(email):
     # Simple email validation regex
